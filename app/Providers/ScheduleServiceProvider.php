@@ -20,8 +20,9 @@ class ScheduleServiceProvider extends ServiceProvider
      */
     public function boot(Schedule $schedule): void
     {
-        $schedule->command(PlayScheduledPlaylists::class)
-                 ->everySecond()
-                 ->withoutOverlapping();
+      $schedule->command('run:scheduled-playlists')
+        ->everyFiveSeconds()
+        ->withoutOverlapping();
+
     }
 }

@@ -78,8 +78,9 @@ class PlayScheduledPlaylists extends Command
                     Cache::put('now_playing', [
                         'title' => $song->title,
                         'file_url' => $song->hasMedia('audio') ? $song->getFirstMediaUrl('audio') : null,
-                        'started_at' => now()->timestamp,
+                        'started_at' => now()->subSeconds($offset)->timestamp,
                         'duration' => $this->parseDurationToSeconds($song->length),
+                        'is_live' => true
                     ], now()->addSeconds(10));
 
                     break;
