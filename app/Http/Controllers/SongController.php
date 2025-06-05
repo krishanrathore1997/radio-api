@@ -69,11 +69,12 @@ class SongController extends Controller
             })
             ->get();
 
-        return response()->json([
-            'status' => true,
-            'songs' => SongsListResponse::collection($songs),
-            'message' => 'Song list fetched successfully.'
-        ]);
+            return response()->json([
+                'status' => true,
+                'songs' => SongsListResponse::collection($songs),
+                'message' => 'Song list fetched successfully.'
+            ], 200, [], JSON_UNESCAPED_SLASHES);
+
     }
 
     public function coverImage($id)

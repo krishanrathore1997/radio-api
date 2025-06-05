@@ -14,6 +14,11 @@ class PlayListResponse extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return parent::toArray($request);
+        return [
+            'id' => $this->id,
+            'name' => $this->name,
+            'description' => $this->description ?? null,
+            'songs' => SongsListResponse::collection($this->whenLoaded('songs')),
+        ];
     }
 }

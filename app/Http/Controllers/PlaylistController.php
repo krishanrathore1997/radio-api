@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\PlaylistRequest;
+use App\Http\Resources\PlayListResponse;
 use App\Models\Playlist;
 use Illuminate\Http\Request;
 
@@ -95,7 +96,8 @@ public function list()
         $playlists = Playlist::with('songs')->get();
 
         return response()->json([
-            'playlists' => $playlists,
+            'playlists' => PlayListResponse::collection($playlists),
+            'message' => 'Playlists fetched successfully!',
         ], 200);
     } catch (\Throwable $th) {
         return response()->json([
