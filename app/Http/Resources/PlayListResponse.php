@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,7 +18,6 @@ class PlayListResponse extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
-            'description' => $this->description ?? null,
             'songs' => SongsListResponse::collection($this->whenLoaded('songs')),
         ];
     }

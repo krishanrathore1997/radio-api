@@ -12,6 +12,9 @@ class SongController extends Controller
 {
     public function store(StoreSongsRequest $request)
     {
+        if (!$request->hasFile('file') || !$request->file('file')->isValid()) {
+            return $this->validationError('No valid audio file uploaded.');
+        }
         $file = $request->file('file');
         $meta = (new Song)->getMetaData($file);
 

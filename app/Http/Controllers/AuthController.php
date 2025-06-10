@@ -33,11 +33,9 @@ class AuthController extends Controller
         if (!Auth::attempt($request->only('email', 'password'))) {
             return response()->json(['message' => 'Unauthorized'], 401);
         }
-        // dd($request->all());
 
         $user = Auth::user();
         $token = $user->createToken('API Token')->accessToken;
-
 
         return response()->json([
             'message' => 'Login successful',
@@ -46,9 +44,11 @@ class AuthController extends Controller
         ]);
     }
 
-    public function logout(Request $request)
+    public function logout()
     {
-        $request->user()->token()->revoke();
+        Auth::user()->tokens->each(function ($token) {
+            $token->revoke();
+        });
 
         return response()->json([
             'message' => 'Logged out successfully'

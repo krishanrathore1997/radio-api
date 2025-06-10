@@ -21,7 +21,7 @@ Route::prefix('user')->group(function () {
 });
 
 Route::middleware('auth:api')->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/user/logout', [AuthController::class, 'logout']);
 
     // Category Routes
     Route::prefix('categories')->group(function () {
@@ -56,17 +56,20 @@ Route::middleware('auth:api')->group(function () {
     Route::prefix('schedule')->group(function () {
         Route::get('list', [PlaylistScheduleController::class, 'list']);
         Route::get('today', [PlaylistScheduleController::class, 'todaySchedule']);
+        Route::get('view/{id}', [PlaylistScheduleController::class, 'show']);
         Route::post('store', [PlaylistScheduleController::class, 'store']);
-        Route::post('update/{id}', [PlaylistScheduleController::class, 'updte']);
+        Route::post('update/{id}', [PlaylistScheduleController::class, 'update']);
         Route::delete('delete/{id}', [PlaylistScheduleController::class, 'destroy']);
     });
 });
 Route::get('/songs/{id}/cover_image', [SongController::class, 'coverImage'])->name('songs.coverImage');    // Delete a song
-Route::get('/now-playing', function () {
-    return response()->json(Cache::get('now_playing', [
-        'title' => 'No song playing',
-        'file_url' => null,
-        'started_at' => null,
-        'duration' => null
-    ]));
-});
+Route::get('now-playing', [PlaylistScheduleController::class, 'nowPlaying'])->name('now_playing');
+
+// Route::get('/now-playing', function () {
+//     return response()->json(Cache::get('now_playing', [
+//         'title' => 'No song playing',
+//         'file_url' => null,
+//         'started_at' => null,
+//         'duration' => null
+//     ]));
+// });

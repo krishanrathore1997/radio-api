@@ -29,7 +29,7 @@ class PlayScheduledPlaylists extends Command
             $endTime = Carbon::parse("{$schedule->schedule_date} {$schedule->end_time}");
 
             if ($now->lt($startTime) || $now->gte($endTime)) {
-                Log::debug("⏩ Skipping schedule ID {$schedule->id} — Not active now");
+                Log::debug("⏩ Skipping schedule ID {$schedule->id}  start time: {$startTime} , end time: {$endTime} — Not active now");
                 continue;
             }
 
@@ -81,7 +81,7 @@ class PlayScheduledPlaylists extends Command
                         'started_at' => now()->subSeconds($offset)->timestamp,
                         'duration' => $this->parseDurationToSeconds($song->length),
                         'is_live' => true
-                    ], now()->addSeconds(10));
+                    ]);
 
                     break;
                 }

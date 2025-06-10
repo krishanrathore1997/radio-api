@@ -61,7 +61,8 @@ public function show($id)
         $playlist = Playlist::with('songs')->findOrFail($id);
 
         return response()->json([
-            'playlist' => $playlist,
+            'playlist' => new PlayListResponse($playlist),
+            'message' => 'Playlist fetched successfully!',
         ], 200);
 
     } catch (\Throwable $th) {
