@@ -14,8 +14,8 @@ return new class extends Migration
         Schema::create('playlist_schedules', function (Blueprint $table) {
             $table->id();
             $table->foreignId('playlist_id')->constrained()->onDelete('cascade');
-            $table->time('start_time');
-            $table->time('end_time');
+            $table->dateTime('start_time'); // changed to datetime
+            $table->dateTime('end_time');
             $table->date('schedule_date');
             $table->timestamps();
         });

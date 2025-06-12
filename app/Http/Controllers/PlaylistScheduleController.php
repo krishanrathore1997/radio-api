@@ -15,12 +15,12 @@ class PlaylistScheduleController extends Controller
 {
    public function store(StorePlaylistScheduleRequest $request)
 {
-    PlaylistSchedule::create([
-        'playlist_id' => $request->playlist_id,
-        'schedule_date' => $request->schedule_date,
-        'start_time' => $request->start_time,
-        'end_time' => $request->end_time,
-    ]);
+ PlaylistSchedule::create([
+    'playlist_id' => $request->playlist_id,
+    'schedule_date' => $request->schedule_date,
+    'start_time' => Carbon::parse($request->schedule_date . ' ' . $request->start_time),
+    'end_time' => Carbon::parse($request->schedule_date . ' ' . $request->end_time),
+]);
 
     return response()->json(['message' => 'Playlist scheduled successfully.']);
 }
@@ -36,8 +36,8 @@ public function update(UpdatePlaylistScheduleRequest $request, $id)
     $schedule->update([
         'playlist_id' => $request->playlist_id,
         'schedule_date' => $request->schedule_date,
-        'start_time' => $request->start_time,
-        'end_time' => $request->end_time,
+        'start_time' => Carbon::parse($request->schedule_date . ' ' . $request->start_time),
+        'end_time' => Carbon::parse($request->schedule_date . ' ' . $request->end_time),
     ]);
 
     return response()->json(['message' => 'Playlist schedule updated successfully.']);
@@ -53,7 +53,6 @@ public function list()
             'schedules' => [],
         ], 404);
     }
-
     return response()->json([
         'message' => 'Playlist schedules fetched successfully!',
         'list' => ScheduleListResponse::collection($data),
@@ -63,30 +62,35 @@ public function list()
 
 public function todaySchedule()
 {
-    $today = Carbon::now()->toDateString();
+     $appTimezone = config('app.timezone', 'Asia/Kolkata');
 
-    $data = PlaylistSchedule::whereDate('schedule_date', $today)
+    // Get "now" in UTC to match DB timestamps
+    $todayUtc = Carbon::now('UTC')->toDateString();
+
+    // Fetch today's schedule from DB (based on UTC date)
+    $data = PlaylistSchedule::whereDate('schedule_date', $todayUtc)
         ->with('playlist.songs')
         ->first();
 
-    if (!$data) {
+    if (!$data || !$data->playlist) {
         return response()->json([
             'message' => 'No playlist scheduled for today.',
             'playlist' => null,
+            'start_time' => null,
+            'end_time' => null,
         ], 404);
     }
 
     return response()->json([
     'message' => 'Playlist schedule fetched successfully!',
     'playlist' => new PlayListResponse($data->playlist),
-    'start_time' => Carbon::parse($data->start)
-        ->setTimezone('Asia/Kolkata')
-        ->format('h:i A'),
-    'end_time' => Carbon::parse($data->end)
-        ->setTimezone('Asia/Kolkata')
-        ->format('h:i A'),
+    'start_time' => Carbon::parse($data->start_time, 'UTC')
+        ->setTimezone($appTimezone)
+        ->format('h:i A'), // 👈 12-hour time
+    'end_time' => Carbon::parse($data->end_time, 'UTC')
+        ->setTimezone($appTimezone)
+        ->format('h:i A'), // 👈 12-hour time
 ], 200);
-
 }
 public function show($id)
 {
@@ -155,7 +159,7 @@ public function nowPlaying(Request $request)
 
     // Step 5: Return both now playing and active user count
     return response()->json([
-        'now_playing' => $nowPlaying,
+        'data' => $nowPlaying,
         'active_user_count' => count($viewers)
     ]);
 }

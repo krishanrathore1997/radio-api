@@ -6,9 +6,8 @@ use App\Events\NowPlayingEvent;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use App\Models\PlaylistSchedule;
-use Carbon\Carbon;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Storage;
 
 class PlayScheduledPlaylists extends Command
 {
@@ -17,21 +16,28 @@ class PlayScheduledPlaylists extends Command
 
     public function handle()
     {
-        $now = now(); // UTC
-        $today = $now->toDateString();
+        $timezone = config('app.timezone', 'Asia/Kolkata');
+        $now = now()->setTimezone($timezone);
 
         $schedules = PlaylistSchedule::with(['playlist.songs'])
-            ->where('schedule_date', $today)
+            ->whereDate('start_time', $now->toDateString())
             ->get();
 
+        $hasActiveSchedule = false;
+
         foreach ($schedules as $schedule) {
-            $startTime = Carbon::parse("{$schedule->schedule_date} {$schedule->start_time}");
-            $endTime = Carbon::parse("{$schedule->schedule_date} {$schedule->end_time}");
+            $startTime = Carbon::parse($schedule->start_time, 'UTC')->setTimezone($timezone);
+            $endTime   = Carbon::parse($schedule->end_time, 'UTC')->setTimezone($timezone);
+
+
+            $this->info("🔁 Running scheduled playlists at {$now} — {$startTime} to {$endTime} for schedule ID {$schedule->id}");
 
             if ($now->lt($startTime) || $now->gte($endTime)) {
-                Log::debug("⏩ Skipping schedule ID {$schedule->id}  start time: {$startTime} , end time: {$endTime} — Not active now");
+                Log::debug("⏩ Skipping schedule ID {$schedule->id} start: {$startTime} end: {$endTime} — not active now");
                 continue;
             }
+
+            $hasActiveSchedule = true;
 
             $playlist = $schedule->playlist;
             if (!$playlist || $playlist->songs->isEmpty()) {
@@ -40,7 +46,6 @@ class PlayScheduledPlaylists extends Command
             }
 
             $elapsedSinceStart = $startTime->diffInSeconds($now);
-
             $songs = $playlist->songs;
             $durations = [];
             $totalDuration = 0;
@@ -48,7 +53,7 @@ class PlayScheduledPlaylists extends Command
             foreach ($songs as $song) {
                 $seconds = $this->parseDurationToSeconds($song->length);
                 if ($seconds === null || $seconds <= 0) {
-                    Log::error("Invalid song duration for ID {$song->id}: '{$song->length}'");
+                    Log::error("❌ Invalid song duration for ID {$song->id}: '{$song->length}'");
                     continue;
                 }
                 $durations[] = $seconds;
@@ -61,8 +66,8 @@ class PlayScheduledPlaylists extends Command
             }
 
             $loopTime = $elapsedSinceStart % $totalDuration;
-
             $position = 0;
+
             foreach ($songs as $index => $song) {
                 $duration = $durations[$index];
 
@@ -75,6 +80,7 @@ class PlayScheduledPlaylists extends Command
                     ]);
 
                     event(new NowPlayingEvent($song, $offset));
+
                     Cache::put('now_playing', [
                         'title' => $song->title,
                         'file_url' => $song->hasMedia('audio') ? $song->getFirstMediaUrl('audio') : null,
@@ -88,6 +94,12 @@ class PlayScheduledPlaylists extends Command
 
                 $position += $duration;
             }
+        }
+
+        // 🛑 Clear cache if no schedule is active
+        if (!$hasActiveSchedule) {
+            Cache::forget('now_playing');
+            Log::info("🛑 All schedules ended — now_playing cache cleared");
         }
     }
 
