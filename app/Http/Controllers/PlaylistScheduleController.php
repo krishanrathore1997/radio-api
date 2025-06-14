@@ -182,7 +182,7 @@ public function nowPlaying(Request $request)
     foreach ($viewers as $fp => $lastSeen) {
         try {
             $lastSeenTime = Carbon::parse($lastSeen);
-            if ($now->diffInMinutes($lastSeenTime) <= 2) {
+            if ($now->diffInSeconds($lastSeenTime) <= 30) {
                 $activeViewers[$fp] = $lastSeen;
                 $count++;
             }
@@ -196,7 +196,7 @@ public function nowPlaying(Request $request)
     $count = count($activeViewers);
 
     // Update cache
-    Cache::put('live_viewers', $activeViewers, now()->addMinutes(3));
+    Cache::put('live_viewers', $activeViewers, now()->addSeconds(60));
 
     // Get now playing data
     $nowPlaying = Cache::get('now_playing', [
