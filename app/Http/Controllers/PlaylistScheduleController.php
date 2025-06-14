@@ -11,6 +11,7 @@ use App\Models\PlaylistSchedule;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Str;
 class PlaylistScheduleController extends Controller
 {
    public function store(StorePlaylistScheduleRequest $request)
@@ -33,6 +34,19 @@ public function update(UpdatePlaylistScheduleRequest $request, $id)
         return response()->json(['message' => 'Playlist schedule not found.'], 404);
     }
 
+    $nowPlaying = Cache::get('now_playing');
+    if (
+        $nowPlaying &&
+        $schedule->playlist &&
+        $schedule->playlist->songs->contains(function ($song) use ($nowPlaying) {
+            return $song->title === $nowPlaying['title'];
+        }) &&
+        $request->playlist_id !== $schedule->playlist_id
+    ) {
+        Cache::forget('now_playing');
+        \Log::info("🧹 now_playing cache cleared on playlist change for schedule ID: {$schedule->id}");
+    }
+
     $schedule->update([
         'playlist_id' => $request->playlist_id,
         'schedule_date' => $request->schedule_date,
@@ -42,6 +56,7 @@ public function update(UpdatePlaylistScheduleRequest $request, $id)
 
     return response()->json(['message' => 'Playlist schedule updated successfully.']);
 }
+
 
 public function list()
 {
@@ -109,10 +124,10 @@ public function show($id)
         'schedule_date' => Carbon::parse($data->schedule_date)
             ->setTimezone('Asia/Kolkata')
             ->format('Y-m-d'),
-        'start_time' => Carbon::parse($data->start)
+        'start_time' => Carbon::parse($data->start_time,'UTC')
             ->setTimezone('Asia/Kolkata')
             ->format('h:i A'),
-        'end_time' => Carbon::parse($data->end)
+        'end_time' => Carbon::parse($data->end_time,'UTC')
             ->setTimezone('Asia/Kolkata')
             ->format('h:i A'),
     ], 200);
@@ -120,36 +135,70 @@ public function show($id)
 
 public function destroy($id)
 {
-    $schedule = PlaylistSchedule::find($id);
+    $schedule = PlaylistSchedule::with('playlist.songs')->find($id);
 
     if (!$schedule) {
         return response()->json(['message' => 'Playlist schedule not found.'], 404);
+    }
+
+    $nowPlaying = Cache::get('now_playing');
+
+    if (
+        $nowPlaying &&
+        $schedule->playlist &&
+        $schedule->playlist->songs->contains(function ($song) use ($nowPlaying) {
+            return $song->title === $nowPlaying['title'];
+        })
+    ) {
+        Cache::forget('now_playing');
+        \Log::info("🧹 now_playing cache cleared on schedule delete ID: {$schedule->id}");
     }
 
     $schedule->delete();
 
     return response()->json(['message' => 'Playlist schedule deleted successfully.']);
 }
-
 public function nowPlaying(Request $request)
 {
-    // Step 1: Get IP address of the current user
-    $ip = $request->ip();
-    $now = Carbon::now();
+    // Create a fingerprint using IP + User-Agent + Accept-Language
+    $fingerprint = sha1(
+        $request->ip() .
+        $request->userAgent() .
+        $request->header('Accept-Language', '')
+    );
 
-    // Step 2: Get and filter existing viewers from cache
+    $now = Carbon::now();
     $viewers = Cache::get('live_viewers', []);
 
-    // Remove old/inactive IPs (last seen > 2 mins ago)
-    $viewers = array_filter($viewers, function ($lastSeen) use ($now) {
-        return Carbon::parse($lastSeen)->gt($now->subMinutes(2));
-    });
+    // Validate viewers array
+    if (!is_array($viewers)) {
+        $viewers = [];
+    }
 
-    // Step 3: Update current user's IP
-    $viewers[$ip] = $now->toDateTimeString();
-    Cache::put('live_viewers', $viewers, now()->addMinutes(3));
+    // Filter inactive viewers (>2 minutes)
+    $activeViewers = [];
+    $count = 0;
 
-    // Step 4: Get now playing data
+    foreach ($viewers as $fp => $lastSeen) {
+        try {
+            $lastSeenTime = Carbon::parse($lastSeen);
+            if ($now->diffInMinutes($lastSeenTime) <= 2) {
+                $activeViewers[$fp] = $lastSeen;
+                $count++;
+            }
+        } catch (\Exception $e) {
+            // Ignore invalid entries
+        }
+    }
+
+    // Update current fingerprint
+    $activeViewers[$fingerprint] = $now->toDateTimeString();
+    $count = count($activeViewers);
+
+    // Update cache
+    Cache::put('live_viewers', $activeViewers, now()->addMinutes(3));
+
+    // Get now playing data
     $nowPlaying = Cache::get('now_playing', [
         'title' => 'No song playing',
         'file_url' => null,
@@ -157,10 +206,11 @@ public function nowPlaying(Request $request)
         'duration' => null
     ]);
 
-    // Step 5: Return both now playing and active user count
     return response()->json([
         'data' => $nowPlaying,
-        'active_user_count' => count($viewers)
+        'active_user_count' => $count,
+        'fingerprint' => $fingerprint // For debugging
     ]);
 }
+
 }
