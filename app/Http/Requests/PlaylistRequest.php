@@ -20,13 +20,14 @@ class PlaylistRequest extends FormRequest
      *
      * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
      */
-    public function rules(): array
+   public function rules(): array
     {
         return [
-            //
-            "name" => "required|string|max:255",
-            "song_ids" => "required|array|exists:songs,id",
-
+            'name' => 'required|string|max:255',
+            'songs' => 'required|array|min:1',
+            'songs.*.song_id' => 'required|integer|exists:songs,id',
+            'songs.*.order' => 'required|integer|min:0',
         ];
     }
+
 }
